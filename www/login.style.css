@@ -99,6 +99,9 @@ body {
 #email-login-form .form-group:nth-child(2) {
     animation: slideUp 0.5s ease-out 0.5s forwards; /* Staggered delay */
 }
+#email-login-form #confirm-password-group { /* More specific selector for the confirm password field */
+    animation: slideUp 0.5s ease-out 0.55s forwards; /* Staggered delay */
+}
 
 #email-login-form button[type="submit"] {
     animation: slideUp 0.5s ease-out 0.6s forwards; /* Staggered delay */
@@ -249,4 +252,42 @@ body {
 
 .back-link:hover {
     text-decoration: underline;
+}
+/* Styles for password visibility toggle */
+.password-group {
+    position: relative; /* Keep this for positioning context */
+}
+
+.password-group .toggle-password {
+    position: absolute;
+    top: 50%;
+    right: 10px; /* Adjust as needed for padding inside input */
+    transform: translateY(-50%);
+    cursor: pointer;
+    user-select: none;
+    display: flex; /* To help center the SVG if it has intrinsic padding */
+    align-items: center;
+    justify-content: center;
+    width: 24px; /* Container for SVG */
+    height: 24px; /* Container for SVG */
+    padding: 0; /* Remove previous padding */
+    border: none; /* Remove previous border */
+    background-color: transparent; /* Remove previous background */
+}
+
+.password-group .toggle-password svg {
+    width: 16px; /* Control SVG size */
+    height: 16px; /* Control SVG size */
+    fill: #888888; /* Grey color for the icon */
+    transition: fill 0.2s ease;
+}
+
+.password-group .toggle-password:hover svg {
+    fill: #b0b0b0; /* Lighter grey on hover */
+}
+
+/* Ensure input padding accommodates the icon */
+#login-overlay .form-group input[type="password"],
+#login-overlay .form-group input[type="text"] { /* Target inputs within the overlay specifically */
+    padding-right: 35px; /* Make space for the icon + a little buffer */
 }

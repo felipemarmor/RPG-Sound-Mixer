@@ -1,5 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // SVG Icons for password visibility - using single quotes and concatenation
+    const eyeIconSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-fill" viewBox="0 0 16 16">' +
+        '<path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>' +
+        '<path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>' +
+    '</svg>';
+    const eyeSlashIconSVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash-fill" viewBox="0 0 16 16">' +
+        '<path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.938 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z"/>' +
+        '<path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z"/>' +
+    '</svg>';
     console.log('DOMContentLoaded event fired. Script starting. v2'); // v2 to confirm update
+    
+    const defaultUserIconContent = '👤'; // Store the default icon
+
     // User Menu Dropdown
     const userIconBtn = document.getElementById('user-icon-btn');
     const userDropdown = document.getElementById('user-dropdown');
@@ -333,13 +345,78 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loginBtnTrigger && loginOverlay && closeLoginOverlayBtn) {
         console.log('Login trigger button and overlay elements FOUND. Adding event listeners.');
         loginBtnTrigger.addEventListener('click', () => {
-            console.log('Login button TRIGGERED!'); // Log when the button is clicked
-            loginOverlay.style.display = 'flex';
-            document.body.classList.add('overlay-active');
-            // Also, ensure the user dropdown closes if it's open
-            const userDropdown = document.getElementById('user-dropdown');
-            if (userDropdown && userDropdown.classList.contains('active')) {
-                userDropdown.classList.remove('active');
+            if (loginBtnTrigger.textContent === 'Logout') {
+                // Perform Logout
+                console.log('Logout button TRIGGERED!');
+                loginBtnTrigger.textContent = 'Login';
+                if (userIconBtn) {
+                    userIconBtn.innerHTML = defaultUserIconContent; // Revert to default icon
+                }
+                // TODO: Clear any stored user session/token if implemented later
+                alert('You have been logged out.');
+                // Ensure dropdown closes if it was open due to this button
+                if (userDropdown && userDropdown.classList.contains('active')) {
+                    userDropdown.classList.remove('active');
+                }
+
+            } else {
+                // Perform Login (Open Overlay)
+                console.log('Login button TRIGGERED!');
+                loginOverlay.style.display = 'flex';
+                document.body.classList.add('overlay-active');
+                // Also, ensure the user dropdown closes if it's open
+                const localUserDropdown = document.getElementById('user-dropdown'); // Use local var to avoid conflict
+                if (localUserDropdown && localUserDropdown.classList.contains('active')) {
+                    localUserDropdown.classList.remove('active');
+                }
+
+                // EYE ICON SETUP (only when opening for login/signup)
+                console.log('[Inside Login Trigger] Attempting to get currentLoginOverlay by ID...');
+                const currentLoginOverlay = document.getElementById('login-overlay');
+                console.log('[Inside Login Trigger] currentLoginOverlay value:', currentLoginOverlay);
+
+                if (!currentLoginOverlay) {
+                    console.error('[Inside Login Trigger] CRITICAL: login-overlay element itself was NOT FOUND (is null) when trying to set up eye icons!');
+                    alert("Developer Alert: 'login-overlay' element not found when trying to set up eye icons. Check script.js and index.html.");
+                    return;
+                }
+                console.log('[Inside Login Trigger] currentLoginOverlay was found. Proceeding to query for .toggle-password spans.');
+
+                const overlayTogglePasswordSpans = currentLoginOverlay.querySelectorAll('.toggle-password');
+                console.log('[Inside Login Trigger] Found overlayTogglePasswordSpans:', overlayTogglePasswordSpans.length, 'in overlay:', currentLoginOverlay, overlayTogglePasswordSpans);
+                overlayTogglePasswordSpans.forEach(span => {
+                    if (!span.dataset.listenerAttached) {
+                        console.log('[Inside Login Trigger] Attaching click listener and setting initial icon for span:', span);
+                        span.innerHTML = eyeIconSVG;
+                        const initialTargetInputId = span.dataset.for;
+                        const initialTargetInput = document.getElementById(initialTargetInputId);
+                        if (initialTargetInput) {
+                            initialTargetInput.type = 'password';
+                        }
+
+                        span.addEventListener('click', () => {
+                            const targetInputId = span.dataset.for;
+                            const targetInput = document.getElementById(targetInputId);
+                            console.log(`Overlay toggle password clicked for input ID: ${targetInputId}`, targetInput);
+                            if (targetInput) {
+                                if (targetInput.type === 'password') {
+                                    targetInput.type = 'text';
+                                    console.log('Setting eyeSlashIconSVG for span:', span);
+                                    span.innerHTML = eyeSlashIconSVG;
+                                    console.log('Span innerHTML after setting slash:', span.innerHTML.substring(0, 30) + "...");
+                                } else {
+                                    targetInput.type = 'password';
+                                    console.log('Setting eyeIconSVG for span:', span);
+                                    span.innerHTML = eyeIconSVG;
+                                    console.log('Span innerHTML after setting eye:', span.innerHTML.substring(0, 30) + "...");
+                                }
+                            } else {
+                                console.error(`Overlay target input not found for ID: ${targetInputId}`);
+                            }
+                        });
+                        span.dataset.listenerAttached = 'true';
+                    }
+                });
             }
         });
     
@@ -388,6 +465,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('Show signup link CLICKED');
                 overlayH1.textContent = 'Create Account';
                 overlaySubmitButton.textContent = 'Sign Up';
+                
+                // This ID 'confirm-password-group' should now exist in index.html's overlay
+                const confirmPasswordGroup = document.getElementById('confirm-password-group');
+                if (confirmPasswordGroup) {
+                    confirmPasswordGroup.style.display = 'block';
+                    // The input ID inside this group is 'modal-confirm-password'
+                    const confirmPasswordInput = document.getElementById('modal-confirm-password');
+                    if (confirmPasswordInput) {
+                        confirmPasswordInput.required = true;
+                    } else {
+                        console.error("'modal-confirm-password' input not found within confirm-password-group.");
+                    }
+                } else {
+                    console.error("'confirm-password-group' div not found in overlay for signup mode.");
+                }
+
                 pShowSignupContainer.style.display = 'none';
                 pShowLoginContainer.style.display = 'block';
                 overlayEmailLoginForm.dataset.mode = 'signup';
@@ -398,6 +491,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('Show login link CLICKED');
                 overlayH1.textContent = 'Login';
                 overlaySubmitButton.textContent = 'Login';
+
+                // This ID 'confirm-password-group' should now exist in index.html's overlay
+                const confirmPasswordGroup = document.getElementById('confirm-password-group');
+                if (confirmPasswordGroup) {
+                    confirmPasswordGroup.style.display = 'none';
+                     // The input ID inside this group is 'modal-confirm-password'
+                    const confirmPasswordInput = document.getElementById('modal-confirm-password');
+                    if (confirmPasswordInput) {
+                        confirmPasswordInput.required = false;
+                    } else {
+                        console.error("'modal-confirm-password' input not found within confirm-password-group for login mode.");
+                    }
+                } else {
+                    console.error("'confirm-password-group' div not found in overlay for login mode.");
+                }
+
                 pShowSignupContainer.style.display = 'block';
                 pShowLoginContainer.style.display = 'none';
                 overlayEmailLoginForm.dataset.mode = 'login';
@@ -410,18 +519,102 @@ document.addEventListener('DOMContentLoaded', () => {
         overlayEmailLoginForm.addEventListener('submit', (event) => {
             event.preventDefault();
             console.log('Email form SUBMITTED.');
-            const emailInput = document.getElementById('modal-email'); // Use specific ID from overlay
-            const passwordInput = document.getElementById('modal-password'); // Use specific ID from overlay
+            // Using the correct IDs from the overlay HTML structure in index.html
+            const emailInput = document.getElementById('modal-email');
+            const passwordInput = document.getElementById('modal-password');
+            const confirmPasswordInput = document.getElementById('modal-confirm-password');
+            // The eye icon setup code block was moved into the loginBtnTrigger click listener.
+            // This redundant block has been removed.
+
             const email = emailInput ? emailInput.value : '';
             const password = passwordInput ? passwordInput.value : '';
             const mode = overlayEmailLoginForm.dataset.mode || 'login';
     
             if (mode === 'login') {
                 console.log('Attempting login with:', { email, password });
-                alert('Login functionality not yet implemented.');
+                if (!email || !password) {
+                    alert('Email and password are required for login.');
+                    return;
+                }
+
+                fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password }), // Send email (which server checks as email or username)
+                })
+                .then(response => response.json().then(data => ({ status: response.status, body: data })))
+                .then(({ status, body }) => {
+                    if (status === 200) {
+                        alert('Login successful! Welcome back, ' + body.username + '!');
+                        // TODO: Handle successful login (e.g., store user info, update UI, close overlay)
+                        console.log('Login successful:', body);
+                        
+                        // Example: Update UI and close overlay
+                        const userIconBtn = document.getElementById('user-icon-btn');
+                        if (userIconBtn) {
+                            userIconBtn.textContent = body.username.charAt(0).toUpperCase(); // Show first letter of username
+                        }
+                        const loginBtnTrigger = document.getElementById('login-btn-trigger');
+                        if (loginBtnTrigger) {
+                            loginBtnTrigger.textContent = 'Logout'; // Change button text
+                            // TODO: Add logout functionality to this button now
+                        }
+                        const loginOverlay = document.getElementById('login-overlay');
+                        if (loginOverlay) loginOverlay.style.display = 'none';
+                        document.body.classList.remove('overlay-active');
+                        overlayEmailLoginForm.reset();
+
+                    } else {
+                        alert('Login failed: ' + (body.message || 'Invalid credentials.'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error during login:', error);
+                    alert('Login failed: An error occurred. Check console for details.');
+                });
+
             } else if (mode === 'signup') {
-                console.log('Attempting sign up with:', { email, password });
-                alert('Sign up functionality not yet implemented.');
+                const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value : '';
+                console.log('Attempting sign up with:', { email, password, confirmPassword });
+
+                if (!email || !password) {
+                    alert('Email and password are required for signup.');
+                    return;
+                }
+                if (password.length < 6) {
+                    alert('Password must be at least 6 characters long.');
+                    return;
+                }
+                if (password !== confirmPassword) {
+                    alert('Passwords do not match.');
+                    return;
+                }
+
+                const username = email; // Using email as username as per previous logic
+
+                fetch('/api/signup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, email, password }),
+                })
+                .then(response => response.json().then(data => ({ status: response.status, body: data })))
+                .then(({ status, body }) => {
+                    if (status === 201) {
+                        alert('Sign up successful! User: ' + body.username + ' (ID: ' + body.userId + ')\nYou can now try to login.');
+                        if (overlayShowLoginLink) overlayShowLoginLink.click(); // Switch to login view
+                        overlayEmailLoginForm.reset(); // Clear the form
+                    } else {
+                        alert('Sign up failed: ' + (body.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error during sign up:', error);
+                    alert('Sign up failed: An error occurred. Check console for details.');
+                });
             }
         });
     } else {

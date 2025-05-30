@@ -100,9 +100,15 @@
                     <label for="modal-email">Email</label>
                     <input type="email" id="modal-email" name="email" required>
                 </div>
-                <div class="form-group">
+                <div class="form-group password-group">
                     <label for="modal-password">Password</label>
                     <input type="password" id="modal-password" name="password" required>
+                    <span class="toggle-password" data-for="modal-password"></span>
+                </div>
+                <div class="form-group password-group" id="confirm-password-group" style="display: none;">
+                    <label for="modal-confirm-password">Confirm Password</label>
+                    <input type="password" id="modal-confirm-password" name="confirm-password">
+                    <span class="toggle-password" data-for="modal-confirm-password"></span>
                 </div>
                 <button type="submit" class="btn-primary">Login</button>
             </form>
