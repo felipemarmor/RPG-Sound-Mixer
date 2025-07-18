@@ -23,7 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const storage = multer.diskStorage({
    destination: function (req, file, cb) {
-       const userId = req.body.userId; // Assuming userId is sent in the form data
+       const userId = req.params.userId; // Read userId from URL parameter
        if (!userId) {
            return cb(new Error("User ID is required for upload."), null);
        }
@@ -40,7 +40,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
    storage: storage,
-   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB file size limit
+   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB file size limit
    fileFilter: function (req, file, cb) {
        if (file.mimetype.startsWith('audio/')) {
            cb(null, true);
@@ -137,7 +137,7 @@ app.post('/api/login', async (req, res) => {
 
 // Save Scene Endpoint
 app.post('/api/scenes', async (req, res) => {
-    const { userId, sceneName, sounds } = req.body;
+    const { userId, sceneName, sounds, totalTiles } = req.body;
     console.log(`[SERVER.JS] /api/scenes hit. UserID: ${userId}, SceneName: ${sceneName}`);
 
     if (!userId || !sceneName || !Array.isArray(sounds)) {
@@ -156,11 +156,11 @@ app.post('/api/scenes', async (req, res) => {
             console.log(`[SERVER.JS] Scene "${sceneName}" exists (ID: ${sceneId}). Updating sounds.`);
             const deleteOldSoundsSql = `DELETE FROM SceneSounds WHERE scene_id = ?`;
             await dbRun(deleteOldSoundsSql, [sceneId]);
-            const updateSceneTimestampSql = `UPDATE Scenes SET updated_at = CURRENT_TIMESTAMP WHERE scene_id = ?`;
-            await dbRun(updateSceneTimestampSql, [sceneId]);
+            const updateSceneTimestampSql = `UPDATE Scenes SET updated_at = CURRENT_TIMESTAMP, total_tiles = ? WHERE scene_id = ?`;
+            await dbRun(updateSceneTimestampSql, [totalTiles, sceneId]);
         } else {
-            const insertSceneSql = `INSERT INTO Scenes (user_id, scene_name) VALUES (?, ?)`;
-            const { lastID } = await dbRun(insertSceneSql, [userId, sceneName]);
+            const insertSceneSql = `INSERT INTO Scenes (user_id, scene_name, total_tiles) VALUES (?, ?, ?)`;
+            const { lastID } = await dbRun(insertSceneSql, [userId, sceneName, totalTiles]);
             sceneId = lastID;
             console.log(`[SERVER.JS] New scene "${sceneName}" created with ID: ${sceneId} for user ${userId}.`);
         }
@@ -198,7 +198,7 @@ app.get('/api/scenes', async (req, res) => {
     }
 
     try {
-        const sql = `SELECT scene_id, scene_name, updated_at FROM Scenes WHERE user_id = ? ORDER BY updated_at DESC`;
+        const sql = `SELECT scene_id, scene_name, total_tiles, updated_at FROM Scenes WHERE user_id = ? ORDER BY updated_at DESC`;
         const scenes = await dbAll(sql, [userId]);
         console.log(`[SERVER.JS] Found ${scenes.length} scenes for user ${userId}.`);
         res.status(200).json(scenes);
@@ -235,7 +235,7 @@ app.get('/api/scenes/:sceneId', async (req, res) => {
     }
 });
 
-app.post('/api/sounds/upload', (req, res) => {
+app.post('/api/sounds/upload/:userId', (req, res) => { // Add :userId to the route
    upload(req, res, async function (err) {
        if (err instanceof multer.MulterError) {
            return res.status(400).json({ message: `Multer error: ${err.message}` });
@@ -243,18 +243,19 @@ app.post('/api/sounds/upload', (req, res) => {
            return res.status(400).json({ message: err.message });
        }
 
-       const { userId, soundName, icon } = req.body;
+       const { soundName, icon } = req.body;
+       const { userId } = req.params;
        const file = req.file;
-
+ 
        if (!userId || !soundName || !icon || !file) {
            return res.status(400).json({ message: 'Missing required fields.' });
        }
 
        try {
            const metadata = await mm.parseFile(file.path);
-           if (metadata.format.duration > 12) {
+           if (metadata.format.duration > 180) {
                fs.unlinkSync(file.path); // Delete the file
-               return res.status(400).json({ message: 'Sound duration cannot exceed 12 seconds.' });
+               return res.status(400).json({ message: 'Sound duration cannot exceed 3 minutes.' });
            }
 
            const relativePath = path.relative(__dirname, file.path).replace(/\\/g, '/');

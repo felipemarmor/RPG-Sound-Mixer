@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RPG Sound Mixer</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header id="app-header">
@@ -124,6 +125,7 @@
             <span class="add-sound-icon">+</span>
         </div>
     </main>
+    <button id="add-tile-btn" class="add-tile-btn">+</button>
     <script src="script.js"></script>
 
     <!-- Login/Signup Overlay -->
@@ -179,12 +181,27 @@
                <form id="upload-sound-form">
                    <input type="file" id="sound-file-input" name="soundFile" accept="audio/*" required>
                    <input type="text" id="sound-name-input" name="soundName" placeholder="Sound Name" required>
-                   <input type="text" id="sound-icon-input" name="icon" placeholder="Icon (e.g., 🎵)" required>
+                   <div class="icon-input-wrapper">
+                       <input type="text" id="sound-icon-input" name="icon" placeholder="Icon (e.g., 🎵)" required>
+                       <button type="button" id="emoji-picker-btn">😀</button>
+                   </div>
                    <button type="submit" id="upload-sound-btn">Upload</button>
                </form>
             </div>
             <button id="add-new-sound-btn" class="add-new-sound-btn" style="display: none;">+</button>
         </div>
     </div>
+
+   <div id="emoji-picker-modal" class="emoji-picker-modal" style="display: none;">
+       <div class="emoji-picker-content">
+           <div class="emoji-picker-header">
+               <h3>Select an Emoji</h3>
+               <button id="close-emoji-picker" class="close-btn">&times;</button>
+           </div>
+           <div class="emoji-picker-list">
+               <!-- Emojis will be populated by script.js -->
+           </div>
+       </div>
+   </div>
 </body>
 </html>
