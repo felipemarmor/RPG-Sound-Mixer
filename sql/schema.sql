@@ -21,13 +21,24 @@ CREATE TABLE IF NOT EXISTS Scenes (
 CREATE TABLE IF NOT EXISTS SceneSounds (
     scene_sound_id INTEGER PRIMARY KEY AUTOINCREMENT,
     scene_id INTEGER NOT NULL,
-    sound_identifier TEXT NOT NULL, -- e.g., 'sounds/music/battle_theme.mp3'
-    volume REAL NOT NULL DEFAULT 1.0, -- Volume from 0.0 to 1.0
-    is_playing BOOLEAN DEFAULT FALSE, -- Or other playback state info
-    loop_sound BOOLEAN DEFAULT FALSE,
+    sound_name TEXT NOT NULL, -- matches sound IDs like "rain", "campfire"
+    volume REAL NOT NULL, -- values between 0.0 and 1.0
+    slot_index INTEGER NOT NULL, -- representing the UI position of the sound in the mixer interface
     FOREIGN KEY (scene_id) REFERENCES Scenes (scene_id) ON DELETE CASCADE
+);
+
+-- Sounds Table
+CREATE TABLE IF NOT EXISTS Sounds (
+    sound_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sound_name TEXT NOT NULL,
+    file_path TEXT NOT NULL UNIQUE,
+    icon TEXT, -- e.g., emoji '🎵'
+    user_id INTEGER, -- NULL for default sounds, otherwise links to a user
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE SET NULL -- Or CASCADE if you want to delete sounds when user is deleted
 );
 
 -- Optional: Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_scenes_user_id ON Scenes (user_id);
 CREATE INDEX IF NOT EXISTS idx_scenesounds_scene_id ON SceneSounds (scene_id);
+CREATE INDEX IF NOT EXISTS idx_sounds_user_id ON Sounds (user_id);

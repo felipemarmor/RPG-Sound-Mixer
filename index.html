@@ -34,7 +34,7 @@
                     <h2 class="tile-label">Rain</h2>
                 </div>
                 <div class="fader-container tile-fader">
-                    <input type="range" class="volume-slider" data-sound="rain" min="0" max="1" step="0.01" value="0.5" orient="vertical">
+                    <input type="range" class="volume-slider" data-sound="rain" min="0" max="1" step="0.01" value="0.5">
                 </div>
             </div>
             <span class="add-sound-icon">+</span>
@@ -46,7 +46,7 @@
                     <h2 class="tile-label">Wind</h2>
                 </div>
                 <div class="fader-container tile-fader">
-                    <input type="range" class="volume-slider" data-sound="wind" min="0" max="1" step="0.01" value="0.5" orient="vertical">
+                    <input type="range" class="volume-slider" data-sound="wind" min="0" max="1" step="0.01" value="0.5">
                 </div>
             </div>
             <span class="add-sound-icon">+</span>
@@ -58,7 +58,7 @@
                     <h2 class="tile-label">City</h2>
                 </div>
                 <div class="fader-container tile-fader">
-                    <input type="range" class="volume-slider" data-sound="city" min="0" max="1" step="0.01" value="0.5" orient="vertical">
+                    <input type="range" class="volume-slider" data-sound="city" min="0" max="1" step="0.01" value="0.5">
                 </div>
             </div>
             <span class="add-sound-icon">+</span>
@@ -70,15 +70,59 @@
                     <h2 class="tile-label">Battle</h2>
                 </div>
                 <div class="fader-container tile-fader">
-                    <input type="range" class="volume-slider" data-sound="battle" min="0" max="1" step="0.01" value="0.5" orient="vertical">
+                    <input type="range" class="volume-slider" data-sound="battle" min="0" max="1" step="0.01" value="0.5">
                 </div>
             </div>
             <span class="add-sound-icon">+</span>
         </div>
-        <div class="drop-slot"><span class="add-sound-icon">+</span></div>
-        <div class="drop-slot"><span class="add-sound-icon">+</span></div>
-        <div class="drop-slot"><span class="add-sound-icon">+</span></div>
-        <div class="drop-slot"><span class="add-sound-icon">+</span></div>
+        <div class="drop-slot">
+            <div class="sound-tile" id="forest-tile" data-sound="forest" draggable="true">
+                <div class="tile-main-content">
+                    <span class="tile-icon">🌲</span>
+                    <h2 class="tile-label">Forest</h2>
+                </div>
+                <div class="fader-container tile-fader">
+                    <input type="range" class="volume-slider" data-sound="forest" min="0" max="1" step="0.01" value="0.5">
+                </div>
+            </div>
+            <span class="add-sound-icon">+</span>
+        </div>
+        <div class="drop-slot">
+            <div class="sound-tile" id="campfire-tile" data-sound="campfire" draggable="true">
+                <div class="tile-main-content">
+                    <span class="tile-icon">🔥</span>
+                    <h2 class="tile-label">Campfire</h2>
+                </div>
+                <div class="fader-container tile-fader">
+                    <input type="range" class="volume-slider" data-sound="campfire" min="0" max="1" step="0.01" value="0.5">
+                </div>
+            </div>
+            <span class="add-sound-icon">+</span>
+        </div>
+        <div class="drop-slot">
+            <div class="sound-tile" id="tavern-tile" data-sound="tavern" draggable="true">
+                <div class="tile-main-content">
+                    <span class="tile-icon">🍺</span>
+                    <h2 class="tile-label">Tavern</h2>
+                </div>
+                <div class="fader-container tile-fader">
+                    <input type="range" class="volume-slider" data-sound="tavern" min="0" max="1" step="0.01" value="0.5">
+                </div>
+            </div>
+            <span class="add-sound-icon">+</span>
+        </div>
+        <div class="drop-slot">
+            <div class="sound-tile" id="cave-tile" data-sound="cave" draggable="true">
+                <div class="tile-main-content">
+                    <span class="tile-icon">🦇</span>
+                    <h2 class="tile-label">Cave</h2>
+                </div>
+                <div class="fader-container tile-fader">
+                    <input type="range" class="volume-slider" data-sound="cave" min="0" max="1" step="0.01" value="0.5">
+                </div>
+            </div>
+            <span class="add-sound-icon">+</span>
+        </div>
     </main>
     <script src="script.js"></script>
 
@@ -128,39 +172,18 @@
             <button class="close-btn" id="close-add-sound-overlay">&times;</button>
             <h2>Select a Sound</h2>
             <div id="available-sounds-list">
-                <div class="available-sound-item" data-sound-name="rain" data-sound-symbol="🌧️" data-sound-file="sounds/rain.mp3">
-                    <span class="tile-icon">🌧️</span>
-                    <span class="tile-label">Rain</span>
-                </div>
-                <div class="available-sound-item" data-sound-name="wind" data-sound-symbol="🌬️" data-sound-file="sounds/wind.mp3">
-                    <span class="tile-icon">🌬️</span>
-                    <span class="tile-label">Wind</span>
-                </div>
-                <div class="available-sound-item" data-sound-name="city" data-sound-symbol="🏙️" data-sound-file="sounds/city.mp3">
-                    <span class="tile-icon">🏙️</span>
-                    <span class="tile-label">City</span>
-                </div>
-                <div class="available-sound-item" data-sound-name="battle" data-sound-symbol="⚔️" data-sound-file="sounds/battle.mp3">
-                    <span class="tile-icon">⚔️</span>
-                    <span class="tile-label">Battle</span>
-                </div>
-                <div class="available-sound-item" data-sound-name="forest" data-sound-symbol="🌲" data-sound-file="sounds/forest.mp3">
-                    <span class="tile-icon">🌲</span>
-                    <span class="tile-label">Forest</span>
-                </div>
-                <div class="available-sound-item" data-sound-name="fire" data-sound-symbol="🔥" data-sound-file="sounds/fire.mp3">
-                    <span class="tile-icon">🔥</span>
-                    <span class="tile-label">Fire</span>
-                </div>
-                <div class="available-sound-item" data-sound-name="tavern" data-sound-symbol="🍺" data-sound-file="sounds/tavern.mp3">
-                    <span class="tile-icon">🍺</span>
-                    <span class="tile-label">Tavern</span>
-                </div>
-                <div class="available-sound-item" data-sound-name="cave" data-sound-symbol="🦇" data-sound-file="sounds/cave.mp3">
-                    <span class="tile-icon">🦇</span>
-                    <span class="tile-label">Cave</span>
-                </div>
+               <!-- Sounds will be populated dynamically by script.js -->
             </div>
+            <div id="upload-sound-section" style="display: none;">
+               <hr>
+               <form id="upload-sound-form">
+                   <input type="file" id="sound-file-input" name="soundFile" accept="audio/*" required>
+                   <input type="text" id="sound-name-input" name="soundName" placeholder="Sound Name" required>
+                   <input type="text" id="sound-icon-input" name="icon" placeholder="Icon (e.g., 🎵)" required>
+                   <button type="submit" id="upload-sound-btn">Upload</button>
+               </form>
+            </div>
+            <button id="add-new-sound-btn" class="add-new-sound-btn" style="display: none;">+</button>
         </div>
     </div>
 </body>

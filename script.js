@@ -11,7 +11,83 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded event fired. Script starting. v2'); // v2 to confirm update
     
     const defaultUserIconContent = '👤'; // Store the default icon
+    let currentUserId = null;
+    let currentUsername = null;
 
+    // Scene saving UI elements
+    const newSceneNameInput = document.getElementById('new-scene-name');
+    const saveSceneBtn = document.getElementById('save-scene-btn');
+    const sceneSelect = document.getElementById('scene-select');
+
+function updateSceneControlsAvailability() {
+       const isLoggedIn = !!currentUserId;
+       if (newSceneNameInput) newSceneNameInput.disabled = !isLoggedIn;
+       if (saveSceneBtn) saveSceneBtn.disabled = !isLoggedIn;
+       if (sceneSelect) {
+           sceneSelect.disabled = !isLoggedIn;
+           if (!isLoggedIn) {
+               sceneSelect.innerHTML = '<option value="">- Login to see scenes -</option>';
+           }
+       }
+       const addNewSoundBtn = document.getElementById('add-new-sound-btn');
+       if (addNewSoundBtn) {
+           addNewSoundBtn.style.display = isLoggedIn ? 'block' : 'none';
+       }
+   }
+
+function populateSceneDropdownFromServer(scenesFromServer) {
+        if (!sceneSelect) return;
+        
+        const currentSelectedValue = sceneSelect.value; 
+        
+        sceneSelect.innerHTML = '<option value="">- Select a Server Scene -</option>'; 
+        if (scenesFromServer && scenesFromServer.length > 0) {
+            scenesFromServer.forEach(scene => {
+                const option = document.createElement('option');
+                option.value = scene.scene_id; 
+                option.textContent = scene.scene_name;
+                sceneSelect.appendChild(option);
+            });
+            // Try to reselect previous value if it's a scene_id from the server
+            if (scenesFromServer.find(s => s.scene_id && s.scene_id.toString() === currentSelectedValue)) {
+                sceneSelect.value = currentSelectedValue;
+            }
+        } else if (currentUserId) { // Only show "No server scenes" if logged in
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "- No server scenes found -";
+            option.disabled = true;
+            sceneSelect.appendChild(option);
+        }
+        // updateSceneControlsAvailability(); // This will be called by fetchUserScenesFromServer or login/logout logic
+    }
+
+    async function fetchUserScenesFromServer(userId) {
+        if (!userId) {
+            populateSceneDropdownFromServer([]); // Clear server scenes from dropdown
+            // If you want local scenes to show up immediately on logout, call your local populator:
+            // populateSceneDropdown(); // This is your existing local one that uses 'savedScenes'
+            updateSceneControlsAvailability(); // Ensure UI reflects logged-out state
+            return;
+        }
+        console.log(`Fetching server scenes for user ID: ${userId}`);
+        try {
+            const response = await fetch(`/api/scenes?userId=${userId}`);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'Failed to fetch server scenes.' }));
+                console.error('Error fetching server scenes:', response.status, errorData.message);
+                populateSceneDropdownFromServer([]); // Clear dropdown on error
+                return;
+            }
+            const scenes = await response.json();
+            console.log('Fetched server scenes:', scenes);
+            populateSceneDropdownFromServer(scenes);
+        } catch (error) {
+            console.error('Network error fetching server scenes:', error);
+            populateSceneDropdownFromServer([]); // Clear dropdown on network error
+        }
+        updateSceneControlsAvailability(); // Update controls like disabled states after fetch
+    }
     // User Menu Dropdown
     const userIconBtn = document.getElementById('user-icon-btn');
     const userDropdown = document.getElementById('user-dropdown');
@@ -37,10 +113,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial sound files - changed to let
     let soundFiles = {
-        rain: 'sounds/rain.mp3',
-        wind: 'sounds/wind.mp3',
-        city: 'sounds/city.mp3',
-        battle: 'sounds/battle.mp3'
+        rain: 'sounds/Light Rain.mp3',
+        wind: 'sounds/Wind Sound.mp3',
+        city: 'sounds/city sound.mp3',
+        battle: 'sounds/Medieval Battle Sound.mp3',
+        forest: 'sounds/Forest Sound.mp3',
+        campfire: 'sounds/Campfire Sound.mp3', // "Fire" is mapped to Campfire
+        tavern: 'sounds/Tavern Sound.mp3',
+        cave: 'sounds/Cave Sound.mp3'
     };
 
     // Create initial Audio objects
@@ -58,13 +138,17 @@ document.addEventListener('DOMContentLoaded', () => {
         let originalSlotForDrag = null; // Scoped to this tile's drag operation
 
         tile.addEventListener('dragstart', (event) => {
-            // Ensure the event target is the tile itself or a child, then get the tile.
-            const currentTile = event.target.closest('.sound-tile');
-            if (!currentTile || currentTile !== tile) {
-                // console.warn('Dragstart on unexpected target or mismatched tile.', event.target, tile);
+            // If the drag event originated on the volume slider or its container, prevent the tile drag.
+            if (event.target.classList.contains('volume-slider') ||
+                (event.target.closest && event.target.closest('.fader-container'))) {
+                console.log(`Dragstart on tile ${tile.id} PREVENTED because target was slider or fader container.`);
+                event.preventDefault();
+                event.stopPropagation(); // Also stop propagation to be sure
                 return;
             }
-
+            
+            // console.log(`Dragstart on tile ${tile.id} ALLOWED. Target:`, event.target);
+            const currentTile = tile; // Since this listener is directly on the tile
             draggedTile = currentTile; // Set the global draggedTile
             originalSlotForDrag = draggedTile.parentElement; // Store where it came from
             draggedTile.dataset.droppedSuccessfully = 'false'; // Initialize flag
@@ -179,13 +263,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (audio.currentTime !== 0) {
                                 audio.currentTime = 0;
                             }
-                            // audio.play().catch(e => {
-                            //     console.error(`Error playing sound ${soundName} (expected if file missing):`, e);
-                            //     // DO NOT remove 'playing' class here anymore for visual testing
-                            // });
-                            console.log(`Audio play attempt for ${soundName} (actual sound file might be missing).`);
+                            audio.play().catch(e => {
+                                console.error(`Error playing sound ${soundName}:`, e);
+                                // If playback fails, revert the visual state
+                                tile.classList.remove('playing');
+                            });
+                            // console.log(`Audio play attempt for ${soundName} (actual sound file might be missing).`); // No longer needed with actual play
                         } catch (e) {
-                            // console.warn(`Could not play audio for ${soundName} (expected if file missing):`, e.message);
+                            console.warn(`Could not play audio for ${soundName} due to an exception:`, e.message);
+                            tile.classList.remove('playing'); // Revert visual state on exception too
                         }
                     }
                 }
@@ -205,8 +291,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
             volumeSlider.addEventListener('input', () => {
-                if (audio) audio.volume = volumeSlider.value;
+                const newVolume = parseFloat(volumeSlider.value);
+                console.log(`Slider input for ${soundName}. Target Volume: ${newVolume}. Audio object:`, audio);
+                if (audio) {
+                    audio.volume = newVolume;
+                    console.log(`Volume for ${soundName} property set to: ${audio.volume}`);
+
+                    // --- TEMPORARY DEBUGGING FOR VOLUME RESPONSIVENESS ---
+                    // if (!audio.paused) {
+                    //     console.log(`Attempting to pause/play ${soundName} for volume test.`);
+                    //     audio.pause();
+                    //     setTimeout(() => {
+                    //         audio.play().catch(e => console.error(`Error re-playing ${soundName} after volume test:`, e));
+                    //     }, 50);
+                    // }
+                    // --- END TEMPORARY DEBUGGING ---
+
+                } else {
+                    console.warn(`Cannot change volume for ${soundName}: audio object not found.`);
+                }
             });
+
+            // The dragstart listener on the tile now handles prevention directly by checking event.target.
+            // We still need stopPropagation on mousedown/touchstart on the slider
+            // to prevent other potential parent listeners if any (like a click on the tile itself
+            // if the fader-container was part of the tile's main clickable area).
+            volumeSlider.addEventListener('mousedown', (event) => {
+                event.stopPropagation();
+            });
+            volumeSlider.addEventListener('touchstart', (event) => {
+                event.stopPropagation();
+            }, { passive: true });
+
         }
 
         if (audio && startPlaying) {
@@ -348,16 +464,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (loginBtnTrigger.textContent === 'Logout') {
                 // Perform Logout
                 console.log('Logout button TRIGGERED!');
+                currentUserId = null;
+                currentUsername = null;
                 loginBtnTrigger.textContent = 'Login';
                 if (userIconBtn) {
                     userIconBtn.innerHTML = defaultUserIconContent; // Revert to default icon
                 }
-                // TODO: Clear any stored user session/token if implemented later
+                if (newSceneNameInput) newSceneNameInput.disabled = true;
+                if (saveSceneBtn) saveSceneBtn.disabled = true;
+                // if (sceneSelect) sceneSelect.disabled = true; // updateSceneControlsAvailability will handle this
+                fetchUserScenesFromServer(null); // Clear server scenes and update controls
                 alert('You have been logged out.');
                 // Ensure dropdown closes if it was open due to this button
                 if (userDropdown && userDropdown.classList.contains('active')) {
                     userDropdown.classList.remove('active');
                 }
+                console.log('User logged out. currentUserId:', currentUserId);
 
             } else {
                 // Perform Login (Open Overlay)
@@ -547,27 +669,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 .then(response => response.json().then(data => ({ status: response.status, body: data })))
                 .then(({ status, body }) => {
                     if (status === 200) {
-                        alert('Login successful! Welcome back, ' + body.username + '!');
-                        // TODO: Handle successful login (e.g., store user info, update UI, close overlay)
-                        console.log('Login successful:', body);
+                        currentUserId = body.userId; // Set global currentUserId
+                        currentUsername = body.username; // Set global currentUsername
                         
-                        // Example: Update UI and close overlay
-                        const userIconBtn = document.getElementById('user-icon-btn');
+                        // Update UI
                         if (userIconBtn) {
-                            userIconBtn.textContent = body.username.charAt(0).toUpperCase(); // Show first letter of username
+                            userIconBtn.textContent = currentUsername.charAt(0).toUpperCase();
                         }
-                        const loginBtnTrigger = document.getElementById('login-btn-trigger');
                         if (loginBtnTrigger) {
-                            loginBtnTrigger.textContent = 'Logout'; // Change button text
-                            // TODO: Add logout functionality to this button now
+                            loginBtnTrigger.textContent = 'Logout';
                         }
+                        
+                        updateSceneControlsAvailability(); // Manually call this to enable controls
+                        fetchUserScenesFromServer(currentUserId); // Fetch server scenes for the logged-in user
+
                         const loginOverlay = document.getElementById('login-overlay');
                         if (loginOverlay) loginOverlay.style.display = 'none';
                         document.body.classList.remove('overlay-active');
                         overlayEmailLoginForm.reset();
+                        alert('Login successful! Welcome back, ' + currentUsername + '!');
+                        console.log('Login successful:', body, 'currentUserId:', currentUserId);
 
                     } else {
+                        currentUserId = null; // Ensure user ID is null on failed login
+                        currentUsername = null;
                         alert('Login failed: ' + (body.message || 'Invalid credentials.'));
+                        updateSceneControlsAvailability(); // Reflect logged-out state for scene controls
                     }
                 })
                 .catch(error => {
@@ -644,12 +771,11 @@ document.addEventListener('DOMContentLoaded', () => {
         soundMixerContainer.addEventListener('click', (event) => {
             const clickedSlot = event.target.closest('.drop-slot');
             // Ensure the click is on an .add-sound-icon AND that its parent slot is actually empty.
-            // The CSS should make the icon non-interactive if a tile is present, but this is a safeguard.
             if (event.target.classList.contains('add-sound-icon') && clickedSlot && !clickedSlot.querySelector('.sound-tile')) {
                 targetSlotForNewSound = clickedSlot;
+                fetchAndPopulateSounds(); // Fetch sounds when opening the overlay
                 addSoundOverlay.style.display = 'flex';
                 document.body.classList.add('overlay-active');
-                // console.log('Add sound icon clicked, opening overlay for slot:', targetSlotForNewSound);
             }
         });
     }
@@ -669,8 +795,107 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+   async function fetchAndPopulateSounds() {
+       const defaultSounds = Object.keys(soundFiles).map(key => ({
+           sound_name: key,
+           file_path: soundFiles[key],
+           icon: document.getElementById(`${key}-tile`)?.querySelector('.tile-icon')?.textContent || '🎵',
+           is_default: true
+       }));
+
+       let userSounds = [];
+       if (currentUserId) {
+           try {
+               const response = await fetch(`/api/sounds?userId=${currentUserId}`);
+               if (response.ok) {
+                   const serverSounds = await response.json();
+                   // Filter out default sounds that might be in the user's list
+                   userSounds = serverSounds.filter(s => s.user_id === currentUserId);
+               } else {
+                   console.error('Failed to fetch user sounds');
+               }
+           } catch (error) {
+               console.error('Error fetching user sounds:', error);
+           }
+       }
+
+       availableSoundsList.innerHTML = ''; // Clear existing sounds
+
+       // Helper function to create and append sound items
+       const appendSoundItems = (sounds) => {
+           sounds.forEach(sound => {
+               const soundItem = document.createElement('div');
+               soundItem.className = 'available-sound-item';
+               soundItem.dataset.soundName = sound.sound_name;
+               soundItem.dataset.soundSymbol = sound.icon;
+               soundItem.dataset.soundFile = sound.file_path;
+
+               soundItem.innerHTML = `
+                   <span class="tile-icon">${sound.icon}</span>
+                   <span class="tile-label">${sound.sound_name}</span>
+               `;
+
+               if (!sound.is_default && sound.user_id === currentUserId) {
+                   const deleteBtn = document.createElement('button');
+                   deleteBtn.className = 'delete-sound-btn';
+                   deleteBtn.innerHTML = '&times;';
+                   deleteBtn.dataset.soundId = sound.sound_id;
+                   soundItem.appendChild(deleteBtn);
+               }
+               availableSoundsList.appendChild(soundItem);
+           });
+       };
+
+       // Add "Default Sounds" header and items
+       const defaultHeader = document.createElement('h3');
+       defaultHeader.className = 'sounds-list-header';
+       defaultHeader.textContent = 'Default Sounds';
+       availableSoundsList.appendChild(defaultHeader);
+       appendSoundItems(defaultSounds);
+
+       // Add "Custom Sounds" header and items if they exist
+       if (userSounds.length > 0) {
+           const customHeader = document.createElement('h3');
+           customHeader.className = 'sounds-list-header';
+           customHeader.textContent = 'Custom Sounds';
+           availableSoundsList.appendChild(customHeader);
+           appendSoundItems(userSounds);
+       }
+   }
+
+   if (addSoundOverlay) {
+       const addNewSoundBtn = document.getElementById('add-new-sound-btn');
+       const uploadSoundSection = document.getElementById('upload-sound-section');
+       
+       if (addNewSoundBtn) {
+           addNewSoundBtn.addEventListener('click', () => {
+               uploadSoundSection.style.display = uploadSoundSection.style.display === 'none' ? 'block' : 'none';
+           });
+       }
+   }
+
     if (availableSoundsList && addSoundOverlay) {
         availableSoundsList.addEventListener('click', (event) => {
+           if (event.target.classList.contains('delete-sound-btn')) {
+               const soundId = event.target.dataset.soundId;
+               if (confirm('Are you sure you want to delete this sound?')) {
+                   fetch(`/api/sounds/${soundId}`, {
+                       method: 'DELETE',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({ userId: currentUserId })
+                   })
+                   .then(response => response.json())
+                   .then(data => {
+                       if (data.message === 'Sound deleted successfully.') {
+                           fetchAndPopulateSounds(); // Refresh the list
+                       } else {
+                           alert('Error deleting sound: ' + data.message);
+                       }
+                   });
+               }
+               return;
+           }
+
             const selectedSoundItem = event.target.closest('.available-sound-item');
             if (selectedSoundItem && targetSlotForNewSound) {
                 const soundName = selectedSoundItem.dataset.soundName;
@@ -678,13 +903,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const soundFile = selectedSoundItem.dataset.soundFile;
                 const tileId = `${soundName}-tile-${nextTileId++}`;
 
-                // Add to soundFiles and audioElements if not already there (though typically these are new)
                 if (!soundFiles[soundName]) {
                     soundFiles[soundName] = soundFile;
                 }
-                // Audio element creation is handled by initializeSoundTile
 
-                // Create new tile HTML
                 const newTile = document.createElement('div');
                 newTile.className = 'sound-tile';
                 newTile.id = tileId;
@@ -701,158 +923,201 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 targetSlotForNewSound.appendChild(newTile);
                 updateSlotAppearance(targetSlotForNewSound);
-                initializeSoundTile(newTile); // Initialize its audio, events, etc.
-                
-                // Update the global list of sound tiles for future drag/drop operations
-                // soundTiles NodeList is static. To get an updated list:
-                soundTiles = document.querySelectorAll('.sound-tile'); // Re-query to include the new tile
-
+                initializeSoundTile(newTile);
+                soundTiles = document.querySelectorAll('.sound-tile');
 
                 addSoundOverlay.style.display = 'none';
                 document.body.classList.remove('overlay-active');
                 targetSlotForNewSound = null;
-                console.log(`Added new sound tile: ${soundName} to slot.`);
             }
-        
-            // --- Scene Selector Logic ---
-            const sceneSelect = document.getElementById('scene-select');
-            const newSceneNameInput = document.getElementById('new-scene-name');
-            const saveSceneBtn = document.getElementById('save-scene-btn');
-            const SCENES_STORAGE_KEY = 'rpgSoundMixerScenes';
-            let savedScenes = [];
-        
-            function loadScenesFromLocalStorage() {
-                const scenesJson = localStorage.getItem(SCENES_STORAGE_KEY);
-                return scenesJson ? JSON.parse(scenesJson) : [];
-            }
-        
-            function populateSceneDropdown() {
-                // Clear existing options (except the first placeholder)
-                while (sceneSelect.options.length > 1) {
-                    sceneSelect.remove(1);
+        });
+    }
+
+   const uploadSoundForm = document.getElementById('upload-sound-form');
+   if (uploadSoundForm) {
+       uploadSoundForm.addEventListener('submit', function(event) {
+           event.preventDefault();
+           const formData = new FormData(this);
+           formData.append('userId', currentUserId);
+
+           fetch('/api/sounds/upload', {
+               method: 'POST',
+               body: formData
+           })
+           .then(response => response.json())
+           .then(data => {
+               if (data.soundId) {
+                   alert('Upload successful!');
+                   fetchAndPopulateSounds();
+                   document.getElementById('upload-sound-section').style.display = 'none';
+                   this.reset();
+               } else {
+                   alert('Upload failed: ' + data.message);
+               }
+           })
+           .catch(error => {
+               console.error('Error uploading sound:', error);
+               alert('An error occurred during upload.');
+           });
+       });
+   }
+
+    const SCENES_STORAGE_KEY = 'rpgSoundMixerScenes';
+    let savedScenes = [];
+
+    function loadScenesFromLocalStorage() {
+        const scenesJson = localStorage.getItem(SCENES_STORAGE_KEY);
+        return scenesJson ? JSON.parse(scenesJson) : [];
+    }
+
+    function populateSceneDropdown() {
+        if (!sceneSelect) return;
+        while (sceneSelect.options.length > 1) {
+            sceneSelect.remove(1);
+        }
+
+        savedScenes.forEach((scene, index) => {
+            const option = document.createElement('option');
+            option.value = scene.name;
+            option.textContent = scene.name;
+            sceneSelect.appendChild(option);
+        });
+    }
+
+    function loadScene(sceneData) {
+        dropSlots.forEach(slot => {
+            const tile = slot.querySelector('.sound-tile');
+            if (tile) {
+                const soundName = tile.dataset.sound;
+                if (audioElements[soundName]) {
+                    audioElements[soundName].pause();
+                    audioElements[soundName].currentTime = 0;
                 }
-        
-                savedScenes.forEach((scene, index) => {
-                    const option = document.createElement('option');
-                    option.value = scene.name; // Using name as value, ensure names are unique or use index
-                    option.textContent = scene.name;
-                    sceneSelect.appendChild(option);
-                });
+                tile.remove();
             }
-            
-            // Initial load of scenes
-            if (sceneSelect && newSceneNameInput && saveSceneBtn) {
-                savedScenes = loadScenesFromLocalStorage();
-                populateSceneDropdown();
-                // console.log('Loaded scenes:', savedScenes);
-        
-                saveSceneBtn.addEventListener('click', () => {
-                    const sceneName = newSceneNameInput.value.trim();
-                    if (!sceneName) {
-                        alert('Please enter a name for the scene.');
-                        return;
+            updateSlotAppearance(slot);
+        });
+
+        const sounds = sceneData.config || sceneData.sounds;
+        sounds.forEach(soundConfig => {
+            const targetSlot = dropSlots[soundConfig.slot_index];
+            if (targetSlot) {
+                const { sound_name, volume } = soundConfig;
+                let soundSymbol = '❓';
+                const availableSoundDiv = availableSoundsList.querySelector(`.available-sound-item[data-sound-name="${sound_name}"]`);
+                if (availableSoundDiv) {
+                    soundSymbol = availableSoundDiv.dataset.soundSymbol;
+                }
+
+                const newTile = document.createElement('div');
+                newTile.className = 'sound-tile';
+                newTile.id = `${sound_name}-tile-${nextTileId++}`;
+                newTile.dataset.sound = sound_name;
+                newTile.innerHTML = `
+                    <div class="tile-main-content">
+                        <span class="tile-icon">${soundSymbol}</span>
+                        <h2 class="tile-label">${sound_name.charAt(0).toUpperCase() + sound_name.slice(1)}</h2>
+                    </div>
+                    <div class="fader-container tile-fader">
+                        <input type="range" class="volume-slider" data-sound="${sound_name}" min="0" max="1" step="0.01" value="${volume}">
+                    </div>
+                `;
+                
+                targetSlot.appendChild(newTile);
+                initializeSoundTile(newTile, volume, false);
+                updateSlotAppearance(targetSlot);
+            }
+        });
+        soundTiles = document.querySelectorAll('.sound-tile');
+    }
+
+    if (sceneSelect && newSceneNameInput && saveSceneBtn) {
+        savedScenes = loadScenesFromLocalStorage();
+        populateSceneDropdown();
+
+        saveSceneBtn.addEventListener('click', () => {
+            const sceneName = newSceneNameInput.value.trim();
+            if (!sceneName) {
+                alert('Please enter a name for the scene.');
+                return;
+            }
+
+            const soundsToSave = [];
+            document.querySelectorAll('.drop-slot').forEach((slot, index) => {
+                const tile = slot.querySelector('.sound-tile');
+                if (tile) {
+                    const soundId = tile.dataset.sound;
+                    const volumeSlider = tile.querySelector('.volume-slider');
+                    if (soundId && volumeSlider) {
+                        soundsToSave.push({
+                            sound_name: soundId,
+                            volume: parseFloat(volumeSlider.value),
+                            slot_index: index
+                        });
                     }
-        
-                    const currentSceneConfig = [];
-                    dropSlots.forEach((slot, index) => {
-                        const tile = slot.querySelector('.sound-tile');
-                        if (tile) {
-                            const soundName = tile.dataset.sound;
-                            const audio = audioElements[soundName];
-                            currentSceneConfig.push({
-                                soundName: soundName,
-                                volume: audio ? audio.volume : 0.5, // Default if audio somehow not found
-                                isPlaying: tile.classList.contains('playing'),
-                                tileId: tile.id // Save tileId for potential future use, not strictly needed for reload
-                            });
-                        } else {
-                            currentSceneConfig.push(null); // Placeholder for empty slot
-                        }
-                    });
-        
-                    const existingSceneIndex = savedScenes.findIndex(s => s.name === sceneName);
-                    if (existingSceneIndex > -1) {
-                        // For now, overwrite. Later, could ask user.
-                        savedScenes[existingSceneIndex].config = currentSceneConfig;
-                        console.log(`Scene "${sceneName}" overwritten.`);
+                }
+            });
+
+            if (currentUserId) {
+                const sceneDataForServer = {
+                    userId: currentUserId,
+                    sceneName: sceneName,
+                    sounds: soundsToSave
+                };
+                
+                fetch('/api/scenes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(sceneDataForServer),
+                })
+                .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, body: data })))
+                .then(({ ok, status, body }) => {
+                    if (ok) {
+                        alert(`Scene "${sceneName}" saved successfully!`);
+                        newSceneNameInput.value = '';
+                        fetchUserScenesFromServer(currentUserId);
                     } else {
-                        savedScenes.push({ name: sceneName, config: currentSceneConfig });
-                        console.log(`Scene "${sceneName}" saved.`);
+                        alert(`Error saving scene: ${body.message || `Server responded with status ${status}`}`);
                     }
-        
-                    localStorage.setItem(SCENES_STORAGE_KEY, JSON.stringify(savedScenes));
-                    populateSceneDropdown();
-                    newSceneNameInput.value = '';
-                    sceneSelect.value = sceneName;
+                })
+                .catch(error => {
+                    console.error('Error saving scene to server:', error);
+                    alert('An error occurred while saving the scene.');
                 });
-        
-                sceneSelect.addEventListener('change', () => {
-                    const selectedSceneName = sceneSelect.value;
-                    if (!selectedSceneName) return;
-        
-                    const sceneToLoad = savedScenes.find(s => s.name === selectedSceneName);
-                    if (sceneToLoad) {
-                        console.log('Loading scene:', sceneToLoad.name);
-                        // 1. Clear existing tiles and stop their audio
-                        dropSlots.forEach(slot => {
-                            const tile = slot.querySelector('.sound-tile');
-                            if (tile) {
-                                const soundName = tile.dataset.sound;
-                                if (audioElements[soundName]) {
-                                    audioElements[soundName].pause();
-                                    audioElements[soundName].currentTime = 0;
-                                }
-                                tile.remove();
-                            }
-                            updateSlotAppearance(slot); // Ensure '+' icon appears
-                        });
-        
-                        // 2. Load new tiles from scene config
-                        sceneToLoad.config.forEach((tileConfig, index) => {
-                            const targetSlot = dropSlots[index];
-                            if (tileConfig && targetSlot) {
-                                const { soundName, volume, isPlaying, tileId: savedTileId } = tileConfig;
-                                
-                                // Find symbol from available sounds (or default if not found)
-                                let soundSymbol = '❓';
-                                const availableSoundDiv = availableSoundsList.querySelector(`.available-sound-item[data-sound-name="${soundName}"]`);
-                                if (availableSoundDiv) {
-                                    soundSymbol = availableSoundDiv.dataset.soundSymbol;
-                                } else {
-                                    // If sound is not in the "available sounds" list (e.g. an old scene with a removed sound)
-                                    // we might need a placeholder or to skip. For now, use default symbol.
-                                    console.warn(`Symbol for sound "${soundName}" not found in available sounds list. Using default.`);
-                                }
-        
-        
-                                const newTile = document.createElement('div');
-                                newTile.className = 'sound-tile';
-                                // Use a new unique ID or the saved one if it helps, but ensure uniqueness if scenes can have same sound multiple times
-                                newTile.id = `${soundName}-tile-${nextTileId++}`;
-                                newTile.dataset.sound = soundName;
-                                newTile.innerHTML = `
-                                    <div class="tile-main-content">
-                                        <span class="tile-icon">${soundSymbol}</span>
-                                        <h2 class="tile-label">${soundName.charAt(0).toUpperCase() + soundName.slice(1)}</h2>
-                                    </div>
-                                    <div class="fader-container tile-fader">
-                                        <input type="range" class="volume-slider" data-sound="${soundName}" min="0" max="1" step="0.01" value="${volume}">
-                                    </div>
-                                `;
-                                
-                                targetSlot.appendChild(newTile);
-                                initializeSoundTile(newTile, volume, isPlaying);
-                                updateSlotAppearance(targetSlot);
-                            }
-                        });
-                        soundTiles = document.querySelectorAll('.sound-tile'); // Update global list
-                    }
-                });
-        
             } else {
-                console.error('Scene selector elements not all found.');
+                const existingSceneIndex = savedScenes.findIndex(s => s.name === sceneName);
+                if (existingSceneIndex > -1) {
+                    savedScenes[existingSceneIndex].config = soundsToSave;
+                } else {
+                    savedScenes.push({ name: sceneName, config: soundsToSave });
+                }
+                localStorage.setItem(SCENES_STORAGE_KEY, JSON.stringify(savedScenes));
+                populateSceneDropdown();
+                newSceneNameInput.value = '';
+                sceneSelect.value = sceneName;
+                alert(`Scene "${sceneName}" saved locally.`);
             }
-        
+        });
+
+        sceneSelect.addEventListener('change', () => {
+            const selectedValue = sceneSelect.value;
+            if (!selectedValue) return;
+
+            if (!isNaN(selectedValue)) {
+                fetch(`/api/scenes/${selectedValue}?userId=${currentUserId}`)
+                    .then(response => response.json())
+                    .then(sceneData => {
+                        if (sceneData && sceneData.sounds) {
+                            loadScene(sceneData);
+                        }
+                    })
+                    .catch(error => console.error('Error loading scene from server:', error));
+            } else {
+                const sceneToLoad = savedScenes.find(s => s.name === selectedValue);
+                if (sceneToLoad) {
+                    loadScene(sceneToLoad);
+                }
+            }
         });
     }
 

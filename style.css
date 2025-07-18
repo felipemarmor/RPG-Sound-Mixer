@@ -86,8 +86,9 @@ html, body {
     padding: 10px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     display: flex;
-    flex-direction: row;
-    align-items: stretch;
+    flex-direction: column; /* Stack main content and fader vertically */
+    align-items: center; /* Center items horizontally, including the fader */
+    justify-content: center; /* Adjust if more specific spacing is needed */
     cursor: grab;
     transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
     aspect-ratio: 1 / 1;
@@ -115,7 +116,8 @@ html, body {
     justify-content: center; /* Center icon and label */
     text-align: center;
     flex-grow: 1; /* Takes up most space */
-    padding-right: 5px; /* Space before fader */
+    /* padding-right removed as fader is now below */
+    width: 100%; /* Ensure it takes full width before fader */
 }
 
 .tile-icon {
@@ -136,41 +138,47 @@ html, body {
     font-weight: 500;
 }
 
-/* Fader specific to tile */
+/* Fader specific to tile - Horizontal Layout */
 .tile-fader.fader-container {
-    width: 35px; /* Slimmer fader */
-    height: auto; /* Fader takes full height of tile */
-    min-height: 0; /* Override previous min-height */
-    background: #222222; /* Darker slot for fader */
+    width: 90%; /* Make fader container wider */
+    height: auto; /* Height will be determined by slider */
+    min-height: 0;
+    background: transparent; /* Optional: make fader container background transparent */
     border-radius: 4px;
-    padding: 5px 2px; /* Vertical padding for slot */
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
-    flex-shrink: 0; /* Prevent fader from shrinking */
-    align-self: stretch; /* Ensure it stretches full height of tile */
+    padding: 5px 0; /* Padding above/below slider */
+    box-shadow: none; /* Optional: remove inset shadow if not desired for horizontal */
+    flex-shrink: 0;
+    margin-top: 8px; /* Space between main content and fader */
+    display: flex; /* To center the slider if its width is less than 100% of this container */
+    justify-content: center;
 }
 
 .tile-fader .volume-slider {
     appearance: none;
     -webkit-appearance: none;
-    /* Length: container inner height (tile height - 10px padding) - thumb length (20px) */
-    /* This needs to be dynamic or a fixed large value if tile height is fixed by aspect-ratio */
-    width: calc(100% - 10px); /* Let's try full height of container minus padding */
-    height: 6px;  /* Thickness of track */
-    background: transparent;
-    transform: rotate(-90deg);
-    /* Centering of rotated slider is handled by flex in fader-container */
+    width: 100%; /* Slider takes full width of its fader-container */
+    height: 8px;  /* Thickness of track */
+    background: #444; /* Track color */
+    border-radius: 4px;
+    cursor: pointer;
+    /* transform: rotate(-90deg); REMOVED for horizontal */
 }
 
 .tile-fader .volume-slider::-webkit-slider-thumb {
     appearance: none; -webkit-appearance: none;
-    width: 10px; height: 20px; /* Slimmer thumb */
-    background: #777; border: 1px solid #555;
-    border-radius: 2px; margin-top: -2px; /* -(10-6)/2 */
+    width: 16px; /* Wider thumb for easier grabbing */
+    height: 16px; /* Taller thumb */
+    background: #888;
+    border: 1px solid #666;
+    border-radius: 50%; /* Circular thumb */
+    /* margin-top: -2px; REMOVE or adjust if track height changes significantly */
 }
 .tile-fader .volume-slider::-moz-range-thumb {
-    width: 10px; height: 20px;
-    background: #777; border: 1px solid #555;
-    border-radius: 2px;
+    width: 16px;
+    height: 16px;
+    background: #888;
+    border: 1px solid #666;
+    border-radius: 50%;
 }
 
 /* Hide old play-pause buttons if any linger (should be removed from HTML) */
@@ -504,4 +512,85 @@ body.overlay-active {
 /* Adjust user menu container if needed due to space-between */
 .user-menu-container {
     /* Potentially add margin if elements get too close on smaller screens */
+}
+
+.add-new-sound-btn {
+   position: absolute;
+   bottom: 15px;
+   right: 15px;
+   width: 50px;
+   height: 50px;
+   border-radius: 50%;
+   background-color: #007bff;
+   color: white;
+   border: none;
+   font-size: 2em;
+   line-height: 50px;
+   text-align: center;
+   cursor: pointer;
+   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+   transition: background-color 0.2s;
+}
+
+.add-new-sound-btn:hover {
+   background-color: #0056b3;
+}
+
+#upload-sound-section {
+   margin-top: 15px;
+   padding-top: 15px;
+   border-top: 1px solid #444;
+}
+
+#upload-sound-form {
+   display: flex;
+   flex-direction: column;
+   gap: 10px;
+}
+
+#upload-sound-form input, #upload-sound-form button {
+   padding: 8px;
+   border-radius: 4px;
+   border: 1px solid #444;
+   background-color: #1e1e1e;
+   color: #e0e0e0;
+}
+
+#upload-sound-form button {
+   background-color: #007bff;
+   cursor: pointer;
+}
+
+.available-sound-item {
+   position: relative;
+}
+
+.delete-sound-btn {
+   position: absolute;
+   top: 5px;
+   right: 5px;
+   background: rgba(0,0,0,0.5);
+   color: white;
+   border: none;
+   border-radius: 50%;
+   width: 20px;
+   height: 20px;
+   font-size: 12px;
+   line-height: 20px;
+   text-align: center;
+   cursor: pointer;
+   display: none; /* Hidden by default */
+}
+
+.available-sound-item:hover .delete-sound-btn {
+   display: block;
+}
+
+.sounds-list-header {
+   grid-column: 1 / -1;
+   text-align: left;
+   color: #ccc;
+   margin: 10px 0 5px;
+   border-bottom: 1px solid #555;
+   padding-bottom: 5px;
 }
