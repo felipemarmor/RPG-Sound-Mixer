@@ -37,6 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
                if (addNewSoundBtn) {
                    addNewSoundBtn.style.display = isLoggedIn ? 'block' : 'none';
                }
+               const connectSpotifyBtn = document.getElementById('connect-spotify-btn');
+               if (connectSpotifyBtn) {
+                   connectSpotifyBtn.style.display = isLoggedIn ? 'block' : 'none';
+               }
            }
 
         function populateSceneDropdownFromServer(scenesFromServer) {
@@ -107,7 +111,146 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Sound Mixer Controls
+       // Spotify Integration
+       const spotifyClientId = '4b196ec84f8140709c59cff50dc13d96';
+       const spotifyRedirectUri = window.location.origin.includes('ngrok') ? 'https://70c4c84c63f8.ngrok-free.app/callback' : 'http://localhost:3001/callback';
+
+       function connectToSpotify() {
+           if (!currentUserId) {
+               alert('Please log in before connecting to Spotify.');
+               return;
+           }
+
+           // Generate a random state for CSRF protection
+           const state = Math.random().toString(36).substring(2, 15);
+           
+           // Store the state and associate it with the user ID
+           const statePayload = { state, userId: currentUserId };
+           const encodedState = btoa(JSON.stringify(statePayload)); // Base64 encode
+
+           localStorage.setItem('spotify_auth_state', state);
+
+           const scopes = [
+               'streaming',
+               'user-read-email',
+               'user-read-private',
+               'user-modify-playback-state'
+           ].join(' ');
+
+           const authUrl = `https://accounts.spotify.com/authorize?` +
+               `response_type=code` +
+               `&client_id=${spotifyClientId}` +
+               `&scope=${encodeURIComponent(scopes)}` +
+               `&redirect_uri=${encodeURIComponent(spotifyRedirectUri)}` +
+               `&state=${encodedState}`;
+
+           window.location.href = authUrl;
+       }
+
+       const connectSpotifyBtn = document.getElementById('connect-spotify-btn');
+       if (connectSpotifyBtn) {
+           connectSpotifyBtn.addEventListener('click', connectToSpotify);
+       }
+
+       // Sound Mixer Controls
+       let spotifyPlayer;
+       let spotifyDeviceId;
+
+       async function getAccessToken() {
+           if (!currentUserId) return null;
+           try {
+               const response = await fetch(`${baseUrl}/api/spotify-token?userId=${currentUserId}`);
+               if (!response.ok) return null;
+               const data = await response.json();
+               return data.accessToken;
+           } catch (error) {
+               console.error('Error fetching access token:', error);
+               return null;
+           }
+       }
+
+       window.onSpotifyWebPlaybackSDKReady = async () => {
+           const token = await getAccessToken();
+           if (!token) {
+               console.log('Could not initialize Spotify player, no access token.');
+               return;
+           }
+
+           spotifyPlayer = new Spotify.Player({
+               name: 'RPG Sound Mixer',
+               getOAuthToken: cb => { cb(token); },
+               volume: 0.5
+           });
+
+           // Error handling
+           spotifyPlayer.addListener('initialization_error', ({ message }) => { console.error(message); });
+           spotifyPlayer.addListener('authentication_error', ({ message }) => { console.error(message); });
+           spotifyPlayer.addListener('account_error', ({ message }) => { console.error(message); });
+           spotifyPlayer.addListener('playback_error', ({ message }) => { console.error(message); });
+
+           // Playback status updates
+           spotifyPlayer.addListener('player_state_changed', state => {
+               if (!state) {
+                   return;
+               }
+               const currentTrack = state.track_window.current_track;
+               const trackName = currentTrack.name;
+               const artistName = currentTrack.artists.map(artist => artist.name).join(', ');
+               const albumArt = currentTrack.album.images[0].url;
+               const isPaused = state.paused;
+
+               const spotifyTile = document.querySelector('.spotify-tile');
+               if (spotifyTile) {
+                   spotifyTile.querySelector('.spotify-track-name').textContent = trackName;
+                   spotifyTile.querySelector('.spotify-track-artist').textContent = artistName;
+                   spotifyTile.querySelector('.spotify-album-art').src = albumArt;
+                   spotifyTile.querySelector('.spotify-play-pause-btn').textContent = isPaused ? '▶️' : '⏸️';
+               }
+           });
+
+           // Ready
+           spotifyPlayer.addListener('ready', ({ device_id }) => {
+               console.log('Ready with Device ID', device_id);
+               spotifyDeviceId = device_id;
+           });
+
+           // Not Ready
+           spotifyPlayer.addListener('not_ready', ({ device_id }) => {
+               console.log('Device ID has gone offline', device_id);
+           });
+
+           // Connect to the player!
+           spotifyPlayer.connect();
+       };
+
+       async function playOnSpotify(spotifyUri) {
+           if (!spotifyDeviceId) {
+               alert('Spotify player is not ready. Please try again.');
+               return;
+           }
+           const token = await getAccessToken();
+           fetch(`https://api.spotify.com/v1/me/player/play?device_id=${spotifyDeviceId}`, {
+               method: 'PUT',
+               body: JSON.stringify({ uris: [spotifyUri] }),
+               headers: {
+                   'Content-Type': 'application/json',
+                   'Authorization': `Bearer ${token}`
+               },
+           });
+       }
+
+       async function searchSpotify(query) {
+           const token = await getAccessToken();
+           if (!token) return [];
+           const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`, {
+               headers: {
+                   'Authorization': `Bearer ${token}`
+               }
+           });
+           const data = await response.json();
+           return data.tracks.items;
+       }
+
         let soundTiles = document.querySelectorAll('.sound-tile'); // Changed to let
         const audioElements = {};
         let nextTileId = 1; // For generating unique IDs for new tiles
@@ -170,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         this.remove(); 
 
                         if (parentSlot && parentSlot.classList.contains('drop-slot')) {
+                            parentSlot.classList.remove('spotify-large');
                             updateSlotAppearance(parentSlot);
                         }
                         soundTiles = document.querySelectorAll('.sound-tile'); 
@@ -188,6 +332,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function initializeSoundTile(tile, initialVolume = 0.5, startPlaying = false) {
+            const closeBtn = tile.querySelector('.close-tile-btn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    tile.remove();
+                });
+            }
             const soundName = tile.dataset.sound;
             if (!soundName) {
                 console.error('Tile is missing data-sound attribute:', tile);
@@ -609,6 +760,32 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             console.error('overlayGoogleLoginBtn element NOT FOUND.');
         }
+function resetAddSoundModal() {
+            const addSoundOverlay = document.getElementById('add-sound-overlay');
+            const availableSoundsList = document.getElementById('available-sounds-list');
+            const spotifySection = document.getElementById('spotify-sound-section');
+            const spotifyEmbedContainer = document.getElementById('spotify-embed-container');
+            const uploadSoundSection = document.getElementById('upload-sound-section');
+
+            if (addSoundOverlay) {
+                addSoundOverlay.style.display = 'none';
+            }
+            document.body.classList.remove('overlay-active');
+            targetSlotForNewSound = null;
+
+            if (availableSoundsList) {
+                availableSoundsList.style.display = 'grid';
+            }
+            if (spotifySection) {
+                spotifySection.style.display = 'none';
+            }
+            if (spotifyEmbedContainer) {
+                spotifyEmbedContainer.innerHTML = '';
+            }
+            if (uploadSoundSection) {
+                uploadSoundSection.style.display = 'none';
+            }
+        }
 
         // --- Add Sound Overlay Logic ---
         const addSoundOverlay = document.getElementById('add-sound-overlay');
@@ -630,16 +807,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (closeAddSoundOverlayBtn && addSoundOverlay) {
-            closeAddSoundOverlayBtn.addEventListener('click', () => {
-                addSoundOverlay.style.display = 'none';
-                document.body.classList.remove('overlay-active');
-                targetSlotForNewSound = null;
-            });
-            addSoundOverlay.addEventListener('click', (event) => { 
+            closeAddSoundOverlayBtn.addEventListener('click', resetAddSoundModal);
+            addSoundOverlay.addEventListener('click', (event) => {
                 if (event.target === addSoundOverlay) {
-                    addSoundOverlay.style.display = 'none';
-                    document.body.classList.remove('overlay-active');
-                    targetSlotForNewSound = null;
+                    resetAddSoundModal();
                 }
             });
         }
@@ -672,9 +843,17 @@ document.addEventListener('DOMContentLoaded', () => {
        function populateSoundSelectorFromCache() {
            const defaultSounds = allAvailableSounds.filter(s => s.is_default);
            const userSounds = allAvailableSounds.filter(s => !s.is_default);
+ 
+           availableSoundsList.innerHTML = '';
 
-           availableSoundsList.innerHTML = ''; 
-
+           const diceRollerOption = document.createElement('div');
+           diceRollerOption.className = 'available-sound-item dice-roller-option';
+           diceRollerOption.innerHTML = `
+                <span class="tile-icon">🎲</span>
+                <span class="tile-label">Dice Roller</span>
+           `;
+           availableSoundsList.appendChild(diceRollerOption);
+ 
            const appendSoundItems = (sounds) => {
                sounds.forEach(sound => {
                    const soundItem = document.createElement('div');
@@ -682,12 +861,12 @@ document.addEventListener('DOMContentLoaded', () => {
                    soundItem.dataset.soundName = sound.sound_name;
                    soundItem.dataset.soundSymbol = sound.icon;
                    soundItem.dataset.soundFile = sound.file_path;
-
+ 
                    soundItem.innerHTML = `
                        <span class="tile-icon">${sound.icon}</span>
                        <span class="tile-label">${sound.sound_name}</span>
                    `;
-
+ 
                    if (!sound.is_default && sound.user_id === currentUserId) {
                        const deleteBtn = document.createElement('button');
                        deleteBtn.className = 'delete-sound-btn';
@@ -698,13 +877,13 @@ document.addEventListener('DOMContentLoaded', () => {
                    availableSoundsList.appendChild(soundItem);
                });
            };
-
+ 
            const defaultHeader = document.createElement('h3');
            defaultHeader.className = 'sounds-list-header';
            defaultHeader.textContent = 'Default Sounds';
            availableSoundsList.appendChild(defaultHeader);
            appendSoundItems(defaultSounds);
-
+ 
            if (userSounds.length > 0) {
                const customHeader = document.createElement('h3');
                customHeader.className = 'sounds-list-header';
@@ -732,6 +911,114 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (availableSoundsList && addSoundOverlay) {
             availableSoundsList.addEventListener('click', (event) => {
+               const diceRollerOption = event.target.closest('.dice-roller-option');
+               if (diceRollerOption) {
+                   if (targetSlotForNewSound) {
+                       addDiceRollerTile(targetSlotForNewSound);
+                       resetAddSoundModal();
+                   }
+                   return;
+               }
+        function addSpotifyTile(targetSlot) {
+            const tileId = `spotify-tile-${nextTileId++}`;
+            const newTile = document.createElement('div');
+            newTile.className = 'sound-tile spotify-tile';
+            newTile.id = tileId;
+            newTile.dataset.sound = 'spotify';
+            newTile.innerHTML = `
+                <button class="close-spotify-btn">&times;</button>
+                <div class="spotify-player-container">
+                    <div class="spotify-track-info">
+                        <img src="Images/Spotify Icon.png" alt="Album Art" class="spotify-album-art">
+                        <div class="spotify-track-details">
+                            <div class="spotify-track-name">Player Ready</div>
+                            <div class="spotify-track-artist">Select a song to play</div>
+                        </div>
+                    </div>
+                    <div class="spotify-player-controls">
+                        <button class="spotify-prev-btn">⏮</button>
+                        <button class="spotify-play-pause-btn">▶️</button>
+                        <button class="spotify-next-btn">⏭</button>
+                    </div>
+                </div>
+            `;
+            targetSlot.appendChild(newTile);
+            targetSlot.classList.add('spotify-large');
+            updateSlotAppearance(targetSlot);
+
+            const closeBtn = newTile.querySelector('.close-spotify-btn');
+            closeBtn.addEventListener('click', () => {
+                const parentSlot = newTile.parentElement;
+                if (spotifyPlayer) {
+                    spotifyPlayer.pause();
+                }
+                newTile.remove();
+                if (parentSlot && parentSlot.classList.contains('drop-slot')) {
+                    parentSlot.classList.remove('spotify-large');
+                    updateSlotAppearance(parentSlot);
+                }
+            });
+
+            const playPauseBtn = newTile.querySelector('.spotify-play-pause-btn');
+            playPauseBtn.addEventListener('click', () => {
+                spotifyPlayer.togglePlay();
+            });
+
+            const prevBtn = newTile.querySelector('.spotify-prev-btn');
+            prevBtn.addEventListener('click', () => {
+                spotifyPlayer.previousTrack();
+            });
+
+            const nextBtn = newTile.querySelector('.spotify-next-btn');
+            nextBtn.addEventListener('click', () => {
+                spotifyPlayer.nextTrack();
+            });
+
+            initializeDragEventsForTile(newTile);
+            soundTiles = document.querySelectorAll('.sound-tile');
+        }
+
+        function addDiceRollerTile(targetSlot) {
+            const tileId = `dice-roller-${nextTileId++}`;
+            const newTile = document.createElement('div');
+            newTile.className = 'sound-tile dice-roller-tile';
+            newTile.id = tileId;
+            newTile.dataset.sound = 'dice-roller';
+            newTile.innerHTML = `
+                <button class="close-tile-btn">&times;</button>
+                <div class="dice-roller-header">Dice Roller</div>
+                <div id="dice-result-display-${tileId}" class="dice-result-display">0</div>
+                <div class="dice-buttons">
+                    <button class="dice-btn" data-sides="4">d4</button>
+                    <button class="dice-btn" data-sides="6">d6</button>
+                    <button class="dice-btn" data-sides="8">d8</button>
+                    <button class="dice-btn" data-sides="10">d10</button>
+                    <button class="dice-btn" data-sides="12">d12</button>
+                    <button class="dice-btn" data-sides="20">d20</button>
+                </div>
+            `;
+            targetSlot.appendChild(newTile);
+            updateSlotAppearance(targetSlot);
+
+            const diceButtons = newTile.querySelectorAll('.dice-btn');
+            const diceResultDisplay = newTile.querySelector(`#dice-result-display-${tileId}`);
+            const diceSound = new Audio('sounds/dice sound effect.mp3');
+
+            diceButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    diceSound.currentTime = 0;
+                    diceSound.play();
+                    const sides = parseInt(button.dataset.sides, 10);
+                    const result = Math.floor(Math.random() * sides) + 1;
+                    diceResultDisplay.textContent = result;
+                });
+            });
+
+            initializeDragEventsForTile(newTile);
+            soundTiles = document.querySelectorAll('.sound-tile');
+        }
+
                if (event.target.classList.contains('delete-sound-btn')) {
                    const soundId = event.target.dataset.soundId;
                    if (confirm('Are you sure you want to delete this sound?')) {
@@ -743,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', () => {
                        .then(response => response.json())
                        .then(data => {
                            if (data.message === 'Sound deleted successfully.') {
-                               fetchAndPopulateSounds(); 
+                               fetchAndPopulateSounds();
                            } else {
                                alert('Error deleting sound: ' + data.message);
                            }
@@ -764,6 +1051,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     newTile.id = tileId;
                     newTile.dataset.sound = soundName;
                     newTile.innerHTML = `
+                        <button class="close-tile-btn">&times;</button>
                         <div class="tile-main-content">
                             <span class="tile-icon">${soundSymbol}</span>
                             <h2 class="tile-label">${soundName.charAt(0).toUpperCase() + soundName.slice(1)}</h2>
@@ -975,6 +1263,16 @@ document.addEventListener('DOMContentLoaded', () => {
                    soundMixer.appendChild(newDropSlot);
                });
            }
+           const removeTileBtn = document.getElementById('remove-tile-btn');
+            if (removeTileBtn) {
+                removeTileBtn.addEventListener('click', () => {
+                    const soundMixer = document.getElementById('sound-mixer');
+                    const dropSlots = soundMixer.querySelectorAll('.drop-slot');
+                    if (dropSlots.length > 1) { // Keep at least one slot
+                        dropSlots[dropSlots.length - 1].remove();
+                    }
+                });
+            }
     }
 
     function loadScene(sceneData) {

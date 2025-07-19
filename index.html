@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RPG Sound Mixer</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header id="app-header">
@@ -17,12 +16,11 @@
             </select>
             <input type="text" id="new-scene-name" placeholder="New scene name...">
             <button id="save-scene-btn">Save Scene</button>
-            <!-- <button id="delete-scene-btn">Delete Scene</button> -->
         </div>
         <div class="user-menu-container">
             <button id="user-icon-btn" class="user-icon-btn" aria-label="User Menu">👤</button>
             <div id="user-dropdown" class="user-dropdown-menu">
-                <button class="dropdown-item" id="settings-btn">Settings</button>
+                <button class="dropdown-item" id="connect-spotify-btn" style="display: none;">Connect to Spotify</button>
                 <button class="dropdown-item" id="login-btn-trigger">Login</button>
             </div>
         </div>
@@ -30,6 +28,7 @@
     <main id="sound-mixer">
         <div class="drop-slot">
             <div class="sound-tile" id="rain-tile" data-sound="rain" draggable="true">
+                <button class="close-tile-btn">&times;</button>
                 <div class="tile-main-content">
                     <span class="tile-icon">🌧️</span>
                     <h2 class="tile-label">Rain</h2>
@@ -42,6 +41,7 @@
         </div>
         <div class="drop-slot">
             <div class="sound-tile" id="wind-tile" data-sound="wind" draggable="true">
+                <button class="close-tile-btn">&times;</button>
                 <div class="tile-main-content">
                     <span class="tile-icon">🌬️</span>
                     <h2 class="tile-label">Wind</h2>
@@ -54,6 +54,7 @@
         </div>
         <div class="drop-slot">
             <div class="sound-tile" id="city-tile" data-sound="city" draggable="true">
+                <button class="close-tile-btn">&times;</button>
                 <div class="tile-main-content">
                     <span class="tile-icon">🏙️</span>
                     <h2 class="tile-label">City</h2>
@@ -66,6 +67,7 @@
         </div>
         <div class="drop-slot">
             <div class="sound-tile" id="battle-tile" data-sound="battle" draggable="true">
+                <button class="close-tile-btn">&times;</button>
                 <div class="tile-main-content">
                     <span class="tile-icon">⚔️</span>
                     <h2 class="tile-label">Battle</h2>
@@ -78,6 +80,7 @@
         </div>
         <div class="drop-slot">
             <div class="sound-tile" id="forest-tile" data-sound="forest" draggable="true">
+                <button class="close-tile-btn">&times;</button>
                 <div class="tile-main-content">
                     <span class="tile-icon">🌲</span>
                     <h2 class="tile-label">Forest</h2>
@@ -90,6 +93,7 @@
         </div>
         <div class="drop-slot">
             <div class="sound-tile" id="campfire-tile" data-sound="campfire" draggable="true">
+                <button class="close-tile-btn">&times;</button>
                 <div class="tile-main-content">
                     <span class="tile-icon">🔥</span>
                     <h2 class="tile-label">Campfire</h2>
@@ -102,6 +106,7 @@
         </div>
         <div class="drop-slot">
             <div class="sound-tile" id="tavern-tile" data-sound="tavern" draggable="true">
+                <button class="close-tile-btn">&times;</button>
                 <div class="tile-main-content">
                     <span class="tile-icon">🍺</span>
                     <h2 class="tile-label">Tavern</h2>
@@ -114,6 +119,7 @@
         </div>
         <div class="drop-slot">
             <div class="sound-tile" id="cave-tile" data-sound="cave" draggable="true">
+                <button class="close-tile-btn">&times;</button>
                 <div class="tile-main-content">
                     <span class="tile-icon">🦇</span>
                     <h2 class="tile-label">Cave</h2>
@@ -125,7 +131,11 @@
             <span class="add-sound-icon">+</span>
         </div>
     </main>
-    <button id="add-tile-btn" class="add-tile-btn">+</button>
+    <div class="grid-controls">
+        <button id="remove-tile-btn" class="grid-control-btn">-</button>
+        <button id="add-tile-btn" class="grid-control-btn">+</button>
+    </div>
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <script src="script.js"></script>
 
     <!-- Login/Signup Overlay -->
@@ -133,13 +143,6 @@
         <div class="overlay-content login-modal-content">
             <button class="close-btn" id="close-login-overlay">&times;</button>
             <h1>Login or Create Account</h1>
-            
-            <button id="google-login-btn" class="social-login-btn google-btn">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google G Logo">
-                Sign in with Google
-            </button>
-    
-            <p class="or-separator"><span>OR</span></p>
     
             <form id="email-login-form">
                 <div class="form-group">
@@ -175,6 +178,10 @@
             <h2>Select a Sound</h2>
             <div id="available-sounds-list">
                <!-- Sounds will be populated dynamically by script.js -->
+            </div>
+            <div id="spotify-sound-section" style="display: none;">
+                <input type="text" id="spotify-search-input" placeholder="Search for a song...">
+                <div id="spotify-search-results"></div>
             </div>
             <div id="upload-sound-section" style="display: none;">
                <hr>

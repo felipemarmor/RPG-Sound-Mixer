@@ -1,9 +1,17 @@
-html, body {
+html {
+    height: 100%;
+}
+
+body {
     height: 100%;
     overflow: hidden;
     margin: 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #1c1c1c; /* Dark background like reference */
+    background-image: url('/Images/background.png');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     color: #e0e0e0;
     -webkit-tap-highlight-color: transparent;
     display: flex;
@@ -58,7 +66,7 @@ html, body {
     padding: 20px;
     flex-grow: 1;
     overflow-y: auto;
-    background-color: #1c1c1c;
+    background-color: transparent;
 }
 
 .drop-slot {
@@ -76,6 +84,11 @@ html, body {
 .drop-slot.drag-over {
     background-color: #333; /* Highlight when dragging over */
     border-color: #007bff;
+}
+
+.drop-slot.spotify-large {
+    grid-column: span 2;
+    grid-row: span 2;
 }
 
 /* Sound Tile Styling */
@@ -96,6 +109,116 @@ html, body {
     z-index: 2;         /* Ensure tile is above the add-sound-icon */
     width: 100%;
     height: 100%;
+}
+
+.spotify-tile {
+    padding: 0;
+    overflow: hidden;
+}
+
+.spotify-tile iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.close-spotify-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    line-height: 20px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.close-tile-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    line-height: 20px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 10;
+    display: none;
+}
+
+.sound-tile:hover .close-tile-btn {
+    display: block;
+}
+
+.spotify-player-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    box-sizing: border-box;
+    background-color: #181818;
+    color: #fff;
+}
+
+.spotify-track-info {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+.spotify-album-art {
+    width: 80px;
+    height: 80px;
+    margin-right: 15px;
+    border-radius: 4px;
+}
+
+.spotify-track-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.spotify-track-name {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.spotify-track-artist {
+    font-size: 0.9em;
+    color: #b3b3b3;
+}
+
+.spotify-player-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+}
+
+.spotify-player-controls button {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.5em;
+    cursor: pointer;
 }
 
 .sound-tile.dragging {
@@ -616,27 +739,40 @@ body.overlay-active {
    padding-bottom: 5px;
 }
 
-.add-tile-btn {
+.grid-controls {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 60px;
-    height: 60px;
+    z-index: 1000;
+    display: flex;
+    gap: 10px;
+}
+
+.grid-control-btn {
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     background-color: #007bff;
     color: white;
     border: none;
-    font-size: 2.5em;
-    line-height: 60px;
+    font-size: 2em;
+    line-height: 50px;
     text-align: center;
     cursor: pointer;
     box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    z-index: 1000;
     transition: background-color 0.2s;
 }
 
-.add-tile-btn:hover {
+.grid-control-btn:hover {
     background-color: #0056b3;
+}
+
+#remove-tile-btn {
+    background-color: #6c757d;
+}
+
+#remove-tile-btn:hover {
+    background-color: #5a6268;
 }
 
 .emoji-picker-modal {
@@ -686,4 +822,142 @@ body.overlay-active {
 
 .emoji-picker-list span:hover {
     background-color: #444;
+}
+
+#spotify-back-btn {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+}
+
+#spotify-back-btn:hover {
+    background-color: #5a6268;
+}
+
+.spotify-option .tile-icon svg {
+    fill: #1DB954;
+    stroke: #1DB954;
+}
+
+#spotify-embed-container {
+    width: 100%;
+    height: 400px;
+}
+
+#spotify-search-input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    box-sizing: border-box;
+    background-color: #333;
+    border: 1px solid #555;
+    color: #fff;
+    border-radius: 4px;
+}
+
+#spotify-search-results {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.spotify-search-result {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.spotify-search-result:hover {
+    background-color: #444;
+}
+
+.spotify-search-result img {
+    width: 40px;
+    height: 40px;
+    margin-right: 10px;
+}
+
+.spotify-search-artist {
+    font-size: 0.8em;
+    color: #b3b3b3;
+}
+
+.dice-roller-tile {
+    background-color: #2b2b2b;
+    border: 1px solid #202020;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dice-roller-header {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #e0e0e0;
+    margin-bottom: 10px;
+}
+
+.dice-result-display {
+    font-size: 2em;
+    font-weight: bold;
+    color: #0090ff;
+    margin-bottom: 10px;
+}
+
+.dice-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+}
+
+.dice-btn {
+    background-color: #444;
+    border: 1px solid #555;
+    color: #fff;
+    border-radius: 4px;
+    padding: 8px 0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.dice-btn:hover {
+    background-color: #555;
+}
+
+@media screen and (max-width: 700px) {
+    #app-header {
+        flex-direction: column;
+        align-items: stretch; /* Make children take full width */
+        gap: 15px;
+        padding: 15px;
+    }
+
+    #scene-selector-container {
+        order: 2; /* Will appear after user menu */
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .user-menu-container {
+        order: 1; /* Will appear before scene selector */
+        align-self: flex-end; /* Pushes it to the right */
+    }
+
+    #scene-selector-container label {
+        text-align: center; /* Center the "Scene:" label */
+    }
 }

@@ -2,6 +2,7 @@ console.log('[SERVER.JS] Script starting...'); // Log 1: Script start
 
 const express = require('express');
 console.log('[SERVER.JS] Express required.');
+const cors = require('cors');
 const bcrypt = require('bcrypt');
 console.log('[SERVER.JS] Bcrypt required.');
 const { db, dbRun, dbGet, dbAll } = require('./db/database.js');
@@ -20,6 +21,26 @@ const port = 3001; // You can choose any port
 app.use(express.json());
 // Middleware to parse URL-encoded bodies (for form submissions if not using JS fetch for JSON)
 app.use(express.urlencoded({ extended: true }));
+
+// CORS Configuration
+const allowedOrigins = [
+    'http://localhost:3001',
+    'https://70c4c84c63f8.ngrok-free.app'
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true
+};
+app.use(cors(corsOptions));
 
 const storage = multer.diskStorage({
    destination: function (req, file, cb) {
@@ -337,6 +358,142 @@ app.delete('/api/sounds/:soundId', async (req, res) => {
    }
 });
 
+app.get('/callback', async (req, res) => {
+    const { code, state, error } = req.query;
+
+    if (error) {
+        console.error('Spotify callback error:', error);
+        return res.redirect('/?error=spotify_login_failed');
+    }
+
+    if (!code || !state) {
+        return res.redirect('/?error=missing_spotify_code_or_state');
+    }
+
+    let decodedState;
+    try {
+        decodedState = JSON.parse(Buffer.from(state, 'base64').toString('utf-8'));
+    } catch (e) {
+        console.error('Invalid state parameter:', e);
+        return res.redirect('/?error=invalid_state');
+    }
+
+    const { userId } = decodedState;
+
+    if (!userId) {
+        return res.redirect('/?error=missing_user_id_in_state');
+    }
+
+    const clientSecret = 'b5f5684dfb4d4b2ebeb3979234f5ce25';
+    const clientId = '4b196ec84f8140709c59cff50dc13d96';
+    const redirectUri = 'https://70c4c84c63f8.ngrok-free.app/callback';
+
+    const params = new URLSearchParams();
+    params.append('grant_type', 'authorization_code');
+    params.append('code', code);
+    params.append('redirect_uri', redirectUri);
+
+    try {
+        const response = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+            },
+            body: params
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error('Error getting Spotify token:', data);
+            return res.redirect('/?error=spotify_token_error');
+        }
+
+        const expires_at = new Date();
+        expires_at.setSeconds(expires_at.getSeconds() + data.expires_in);
+
+        const sql = `
+            UPDATE Users
+            SET spotify_access_token = ?,
+                spotify_refresh_token = ?,
+                spotify_token_expires_at = ?
+            WHERE user_id = ?
+        `;
+        await dbRun(sql, [data.access_token, data.refresh_token, expires_at, userId]);
+
+        res.redirect('/');
+
+    } catch (err) {
+        console.error('Server error during Spotify callback:', err);
+        res.redirect('/?error=internal_server_error');
+    }
+});
+
+app.get('/api/spotify-token', async (req, res) => {
+    const { userId } = req.query;
+    if (!userId) {
+        return res.status(400).json({ message: 'User ID is required.' });
+    }
+
+    try {
+        const userSql = `SELECT spotify_access_token, spotify_refresh_token, spotify_token_expires_at FROM Users WHERE user_id = ?`;
+        const user = await dbGet(userSql, [userId]);
+
+        if (!user || !user.spotify_access_token) {
+            return res.status(404).json({ message: 'User not found or not connected to Spotify.' });
+        }
+
+        const now = new Date();
+        const expiresAt = new Date(user.spotify_token_expires_at);
+
+        if (now >= expiresAt) {
+            // Token is expired, refresh it
+            const clientSecret = 'b5f5684dfb4d4b2ebeb3979234f5ce25';
+            const clientId = '4b196ec84f8140709c59cff50dc13d96';
+
+            const params = new URLSearchParams();
+            params.append('grant_type', 'refresh_token');
+            params.append('refresh_token', user.spotify_refresh_token);
+
+            const response = await fetch('https://accounts.spotify.com/api/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+                },
+                body: params
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error('Error refreshing Spotify token:', data);
+                return res.status(500).json({ message: 'Could not refresh Spotify token.' });
+            }
+
+            const new_expires_at = new Date();
+            new_expires_at.setSeconds(new_expires_at.getSeconds() + data.expires_in);
+
+            const updateSql = `
+                UPDATE Users
+                SET spotify_access_token = ?,
+                    spotify_token_expires_at = ?
+                WHERE user_id = ?
+            `;
+            await dbRun(updateSql, [data.access_token, new_expires_at, userId]);
+
+            return res.json({ accessToken: data.access_token });
+        }
+
+        res.json({ accessToken: user.spotify_access_token });
+
+    } catch (error) {
+        console.error('Error fetching Spotify token:', error);
+        res.status(500).json({ message: 'Server error while fetching token.' });
+    }
+});
+
 // STATIC FILE SERVING
 // Serve static files from the root directory first
 app.use(express.static(__dirname));
@@ -344,6 +501,7 @@ app.use(express.static(__dirname));
 // This order allows /login.style.css to be found in www if not in root.
 app.use(express.static(path.join(__dirname, 'www')));
 app.use('/sounds', express.static(path.join(__dirname, 'sounds')));
+app.use('/Images', express.static(path.join(__dirname, 'Images')));
 
 
 // The app.get('/', ...) route is no longer needed as express.static(__dirname)

@@ -4,6 +4,9 @@ CREATE TABLE IF NOT EXISTS Users (
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE,
     password_hash TEXT NOT NULL,
+    spotify_access_token TEXT,
+    spotify_refresh_token TEXT,
+    spotify_token_expires_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
