@@ -2,7 +2,8 @@ const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const path = require('path');
 
-const dbPath = path.join(__dirname, 'rpg-mixer.db');
+const dataPath = process.env.NODE_ENV === 'production' ? '/data' : __dirname;
+const dbPath = path.join(dataPath, 'rpg-mixer.db');
 const schemaPath = path.join(__dirname, '../sql/schema.sql');
 
 const db = new sqlite3.Database(dbPath, (err) => {

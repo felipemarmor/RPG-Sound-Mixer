@@ -15,7 +15,7 @@ console.log('[SERVER.JS] Path, fs, and multer required.');
 
 const app = express();
 console.log('[SERVER.JS] Express app initialized.');
-const port = 3001; // You can choose any port
+const port = process.env.PORT || 3001;
 
 // Middleware to parse JSON bodies
 app.use(express.json());
@@ -25,7 +25,8 @@ app.use(express.urlencoded({ extended: true }));
 // CORS Configuration
 const allowedOrigins = [
     'http://localhost:3001',
-    'https://70c4c84c63f8.ngrok-free.app'
+    'https://70c4c84c63f8.ngrok-free.app',
+    process.env.RENDER_EXTERNAL_URL
 ];
 
 const corsOptions = {
@@ -42,21 +43,22 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+const dataPath = process.env.NODE_ENV === 'production' ? '/data' : __dirname;
+
 const storage = multer.diskStorage({
-   destination: function (req, file, cb) {
-       const userId = req.params.userId; // Read userId from URL parameter
-       if (!userId) {
-           return cb(new Error("User ID is required for upload."), null);
-       }
-       const userUploadsPath = path.join(__dirname, 'sounds', 'user_uploads', userId.toString());
-       fs.mkdirSync(userUploadsPath, { recursive: true });
-       cb(null, userUploadsPath);
-   },
-   filename: function (req, file, cb) {
-       // Sanitize filename to prevent directory traversal issues
-       const safeFilename = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '');
-       cb(null, Date.now() + '-' + safeFilename);
-   }
+    destination: function (req, file, cb) {
+        const userId = req.params.userId;
+        if (!userId) {
+            return cb(new Error("User ID is required for upload."), null);
+        }
+        const userUploadsPath = path.join(dataPath, 'user_uploads', userId.toString());
+        fs.mkdirSync(userUploadsPath, { recursive: true });
+        cb(null, userUploadsPath);
+    },
+    filename: function (req, file, cb) {
+        const safeFilename = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '');
+        cb(null, Date.now() + '-' + safeFilename);
+    }
 });
 
 const upload = multer({
@@ -386,7 +388,7 @@ app.get('/callback', async (req, res) => {
 
     const clientSecret = 'b5f5684dfb4d4b2ebeb3979234f5ce25';
     const clientId = '4b196ec84f8140709c59cff50dc13d96';
-    const redirectUri = 'https://70c4c84c63f8.ngrok-free.app/callback';
+    const redirectUri = process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/callback` : 'https://70c4c84c63f8.ngrok-free.app/callback';
 
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
@@ -500,7 +502,8 @@ app.use(express.static(__dirname));
 // Then, serve static files from 'www' directory (for login page assets etc.)
 // This order allows /login.style.css to be found in www if not in root.
 app.use(express.static(path.join(__dirname, 'www')));
-app.use('/sounds', express.static(path.join(__dirname, 'sounds')));
+app.use('/sounds', express.static(path.join(__dirname, 'sounds'))); // Serve default sounds
+app.use('/user_uploads', express.static(path.join(dataPath, 'user_uploads'))); // Serve user-uploaded sounds
 app.use('/Images', express.static(path.join(__dirname, 'Images')));
 
 
